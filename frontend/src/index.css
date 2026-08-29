@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------- */
+/* Design tokens — generates first-class Tailwind utilities (bg-canvas,   */
+/* text-ink, border-hairline, bg-signal-agent, font-display, etc).        */
+/* ---------------------------------------------------------------------- */
+@theme {
+  --color-canvas: #0a0e16;
+  --color-panel: #0f1420;
+  --color-panel-elevated: #161d2c;
+  --color-hairline: #232b3d;
+  --color-seam: #1b2233;
+
+  --color-ink: #e8ebf2;
+  --color-ink-muted: #8891a6;
+  --color-ink-faint: #566079;
+
+  /* Functional signal colors — each maps 1:1 to an audit event category. */
+  --color-signal-user: #5b8def;
+  --color-signal-agent: #9b7bef;
+  --color-signal-tool: #f0a93b;
+  --color-signal-pay: #2fbf8f;
+  --color-signal-error: #f0554f;
+
+  /* Reserved for the HITL authorization card only — the page's one       */
+  /* deliberate "signature" accent, distinct from the audit categories.   */
+  --color-authorize: #f5b942;
+  --color-authorize-deep: #d98c1f;
+
+  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Thin, dark scrollbars for the independently-scrolling panels. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: var(--color-hairline);
+  border-radius: 9999px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--color-ink-faint);
+}
+
+/* Visible keyboard focus everywhere, styled to match the console theme. */
+:focus-visible {
+  outline: 2px solid var(--color-signal-user);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* ---------------------------------------------------------------------- */
+/* Motion — one orchestrated "document issued" moment for the             */
+/* authorization card, plus quiet ambient/utility motion elsewhere.       */
+/* ---------------------------------------------------------------------- */
+@keyframes card-issue {
+  0% {
+    opacity: 0;
+    transform: translateY(14px) scale(0.97);
+  }
+  60% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes stamp-down {
+  0% {
+    opacity: 0;
+    transform: scale(2.2) rotate(-18deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.92) rotate(-8deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+@keyframes live-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    box-shadow: 0 0 0 0 rgb(47 191 143 / 0.55);
+  }
+  50% {
+    opacity: 0.55;
+    box-shadow: 0 0 0 5px rgb(47 191 143 / 0);
+  }
+}
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-card-issue {
+  animation: card-issue 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.animate-stamp {
+  animation: stamp-down 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+}
+.animate-live-pulse {
+  animation: live-pulse 2s ease-in-out infinite;
+}
+.animate-row-in {
+  animation: row-in 0.35s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-card-issue,
+  .animate-stamp,
+  .animate-live-pulse,
+  .animate-row-in {
+    animation: none !important;
+  }
+}
