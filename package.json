@@ -1,0 +1,22 @@
+{
+  "name": "agentic-commerce",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Razorpay Buildathon — Track 1 (Agentic Commerce). A Claude-powered shopping agent with human-in-the-loop payment authorization and a real-time explainable audit trail. Monorepo: backend (Express + SQLite + Claude tool-calling + Razorpay Sandbox) and frontend (React 18 + Tailwind v4).",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n backend,frontend -c blue,magenta \"npm run dev -w backend\" \"npm run dev -w frontend\"",
+    "seed": "npm run seed -w backend",
+    "build": "npm run build -w frontend",
+    "start": "npm run start -w backend",
+    "demo": "npm run build && npm run start",
+    "test": "npm run test -w backend",
+    "test:selftest": "npm run test:selftest -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}
