@@ -1,3 +1,4 @@
+<img width="1858" height="1111" alt="Screenshot 2026-09-02 132132" src="https://github.com/user-attachments/assets/974fe40a-9411-4ef9-8006-7b26c1c0ff33" />
 # Nova — Agentic Commerce
 
 **Razorpay Buildathon · Track 1 — AI Growth & Agentic Commerce**
