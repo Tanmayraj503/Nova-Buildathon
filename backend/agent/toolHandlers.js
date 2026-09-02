@@ -3,6 +3,7 @@ import razorpay from '../lib/razorpay.js';
 import { logAudit } from '../lib/audit.js';
 
 export const SPEND_LIMIT_PAISE = 500_000; // ₹5,000 autonomous spend cap
+export const LOW_VALUE_THRESHOLD_PAISE = 100_000; // ₹1,000 — below this, actively try to upsell/cross-sell
 
 const getProductById = db.prepare('SELECT * FROM products WHERE id = ?');
 const getAllProducts = db.prepare(
@@ -13,6 +14,17 @@ const searchProducts = db.prepare(`
   FROM products
   WHERE name LIKE ? OR description LIKE ? OR category LIKE ?
 `);
+// Best upsell/cross-sell candidate for a given product: in stock, within a
+// given price ceiling (so a suggestion can never itself trip the spend
+// guardrail), preferring the same category, then the highest price under
+// that ceiling (maximize order value) among the remaining candidates.
+const findCandidateStmt = db.prepare(`
+  SELECT id, name, description, price_inr, stock, category
+  FROM products
+  WHERE id != ? AND stock > 0 AND price_inr <= ?
+  ORDER BY (category = ?) DESC, price_inr DESC
+  LIMIT 1
+`);
 
 function formatProduct(p) {
   return {
@@ -22,8 +34,46 @@ function formatProduct(p) {
   };
 }
 
+function findCandidate(excludeId, priceCeilingPaise, preferCategory) {
+  return findCandidateStmt.get(excludeId, priceCeilingPaise, preferCategory);
+}
+
 /**
- * search_catalog tool — read-only, no guardrails needed.
+ * Deterministic upsell/cross-sell suggestion for ANY product — always
+ * returns one (when a valid candidate exists), not just for out-of-stock or
+ * low-value items, so a suggestion is available at every point in the
+ * conversation the model might need one (a decline message, a spend-limit
+ * block, or right before checkout). `reason` records why it was offered.
+ *
+ * Includes a ready-to-relay `note` sentence in addition to the structured
+ * fields: attaching a separate JSON field and hoping the model notices and
+ * mentions it on its own proved unreliable in testing — the model reliably
+ * relays guardrail-style message text, so every consumer of this should
+ * prefer embedding `note` directly into whatever text it's already relaying,
+ * rather than leaving "should I mention this" up to the model's judgment.
+ */
+function findSuggestion(product, { priceCeilingPaise = SPEND_LIMIT_PAISE } = {}) {
+  const isOutOfStock = product.stock === 0;
+  const isLowValue = product.price_inr < LOW_VALUE_THRESHOLD_PAISE;
+  const reason = isOutOfStock ? 'OUT_OF_STOCK' : isLowValue ? 'LOW_VALUE' : 'CROSS_SELL';
+
+  const candidate = findCandidate(product.id, priceCeilingPaise, product.category);
+  if (!candidate) return null;
+
+  const formatted = formatProduct(candidate);
+  return {
+    reason,
+    ...formatted,
+    note: `You might also like the ${formatted.name} (${formatted.price_inr_display}, in stock).`,
+  };
+}
+
+/**
+ * search_catalog tool — read-only, no guardrails needed. Attaches a
+ * deterministic suggestion to every result (see findSuggestion) so the
+ * agent always has a concrete, real recommendation on hand — whether the
+ * product is unavailable, cheap, or a perfectly normal in-stock item about
+ * to be ordered.
  */
 export function searchCatalog({ query } = {}) {
   const trimmed = (query ?? '').trim();
@@ -33,7 +83,11 @@ export function searchCatalog({ query } = {}) {
 
   return {
     count: rows.length,
-    products: rows.map(formatProduct),
+    products: rows.map((p) => {
+      const formatted = formatProduct(p);
+      const upsell_suggestion = findSuggestion(p);
+      return upsell_suggestion ? { ...formatted, upsell_suggestion } : formatted;
+    }),
   };
 }
 
@@ -75,14 +129,21 @@ export async function createRazorpayOrder(input, sessionId) {
 
   // --- Guardrail 2: ₹5,000 autonomous spend limit --------------------------
   if (amount > SPEND_LIMIT_PAISE) {
+    // Suggest something that IS within budget — reuses the same candidate
+    // logic, just with the spend limit itself as the price ceiling instead
+    // of a placeholder — so the suggestion can never itself re-trigger this
+    // same guardrail.
+    const suggestion = findSuggestion(product, { priceCeilingPaise: SPEND_LIMIT_PAISE });
     const result = {
       error: 'SPEND_LIMIT_EXCEEDED',
       message:
         `This order totals ₹${(amount / 100).toLocaleString('en-IN')} for ${qty} x ${product.name}, ` +
         `which exceeds the ₹${(SPEND_LIMIT_PAISE / 100).toLocaleString('en-IN')} autonomous spend limit. ` +
-        'The agent cannot place this order without additional human authorization.',
+        'The agent cannot place this order without additional human authorization.' +
+        (suggestion ? ` ${suggestion.note}` : ''),
       limit_inr: SPEND_LIMIT_PAISE / 100,
       attempted_amount_inr: amount / 100,
+      ...(suggestion ? { upsell_suggestion: suggestion } : {}),
     };
     logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', {
       reason: 'SPEND_LIMIT_EXCEEDED',
@@ -96,13 +157,16 @@ export async function createRazorpayOrder(input, sessionId) {
 
   // --- Guardrail 3: stock availability --------------------------------------
   if (product.stock < qty) {
+    const suggestion = findSuggestion(product, { priceCeilingPaise: SPEND_LIMIT_PAISE });
     const result = {
       error: 'OUT_OF_STOCK',
       message:
-        product.stock === 0
+        (product.stock === 0
           ? `"${product.name}" is currently out of stock.`
-          : `Only ${product.stock} unit(s) of "${product.name}" are in stock; ${qty} were requested.`,
+          : `Only ${product.stock} unit(s) of "${product.name}" are in stock; ${qty} were requested.`) +
+        (suggestion ? ` ${suggestion.note}` : ''),
       available_stock: product.stock,
+      ...(suggestion ? { upsell_suggestion: suggestion } : {}),
     };
     logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', {
       reason: 'OUT_OF_STOCK',
