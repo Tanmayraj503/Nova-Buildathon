@@ -54,18 +54,23 @@ function findCandidate(excludeId, priceCeilingPaise, preferCategory) {
  */
 function findSuggestion(product, { priceCeilingPaise = SPEND_LIMIT_PAISE } = {}) {
   const isOutOfStock = product.stock === 0;
+  const isOverSpendLimit = product.price_inr > SPEND_LIMIT_PAISE;
   const isLowValue = product.price_inr < LOW_VALUE_THRESHOLD_PAISE;
-  const reason = isOutOfStock ? 'OUT_OF_STOCK' : isLowValue ? 'LOW_VALUE' : 'CROSS_SELL';
+  const reason = isOutOfStock
+    ? 'OUT_OF_STOCK'
+    : isOverSpendLimit
+      ? 'OVER_SPEND_LIMIT'
+      : isLowValue
+        ? 'LOW_VALUE'
+        : 'CROSS_SELL';
 
   const candidate = findCandidate(product.id, priceCeilingPaise, product.category);
   if (!candidate) return null;
 
   const formatted = formatProduct(candidate);
-  return {
-    reason,
-    ...formatted,
-    note: `You might also like the ${formatted.name} (${formatted.price_inr_display}, in stock).`,
-  };
+  const note = `You might ${reason === 'OVER_SPEND_LIMIT' ? 'consider' : 'also like'} the ${formatted.name} (${formatted.price_inr_display}, in stock) instead.`;
+
+  return { reason, ...formatted, note };
 }
 
 /**
@@ -93,28 +98,15 @@ export function searchCatalog({ query } = {}) {
 
 /**
  * create_razorpay_order tool — the guarded checkout path.
- * Enforces, in order: address present -> product exists -> spend limit -> stock.
+ * Enforces, in order: product exists -> spend limit -> stock -> address present.
+ * Spend limit and stock run first since neither depends on having an address —
+ * a product that can never be ordered should be rejected immediately, rather
+ * than asking the user for personal details first.
  * On success: creates a real Razorpay Sandbox order and atomically persists
  * the local order row + decrements stock so it can't be oversold.
  */
 export async function createRazorpayOrder(input, sessionId) {
   const { product_id, quantity, shipping_address, user_id } = input ?? {};
-
-  // --- Guardrail 1: shipping address is mandatory -------------------------
-  if (!shipping_address || !String(shipping_address).trim()) {
-    const result = {
-      error: 'ADDRESS_REQUIRED',
-      message:
-        'No shipping address has been provided yet. Ask the user for their full shipping address ' +
-        'before attempting to create an order.',
-    };
-    logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', {
-      reason: 'ADDRESS_REQUIRED',
-      product_id,
-      quantity,
-    });
-    return result;
-  }
 
   const product = getProductById.get(product_id);
   if (!product) {
@@ -127,7 +119,7 @@ export async function createRazorpayOrder(input, sessionId) {
   const qty = Math.max(1, parseInt(quantity, 10) || 1);
   const amount = product.price_inr * qty; // paise
 
-  // --- Guardrail 2: ₹5,000 autonomous spend limit --------------------------
+  // --- Guardrail 1: ₹5,000 autonomous spend limit --------------------------
   if (amount > SPEND_LIMIT_PAISE) {
     // Suggest something that IS within budget — reuses the same candidate
     // logic, just with the spend limit itself as the price ceiling instead
@@ -155,7 +147,7 @@ export async function createRazorpayOrder(input, sessionId) {
     return result;
   }
 
-  // --- Guardrail 3: stock availability --------------------------------------
+  // --- Guardrail 2: stock availability --------------------------------------
   if (product.stock < qty) {
     const suggestion = findSuggestion(product, { priceCeilingPaise: SPEND_LIMIT_PAISE });
     const result = {
@@ -173,6 +165,24 @@ export async function createRazorpayOrder(input, sessionId) {
       product_id,
       requested: qty,
       available: product.stock,
+    });
+    return result;
+  }
+
+  // --- Guardrail 3: shipping address is mandatory ---------------------------
+  // Checked last: this product is confirmed orderable (within budget, in
+  // stock) at this point, so it's actually worth asking for delivery details.
+  if (!shipping_address || !String(shipping_address).trim()) {
+    const result = {
+      error: 'ADDRESS_REQUIRED',
+      message:
+        'No shipping address has been provided yet. Ask the user for their full shipping address ' +
+        'before attempting to create an order.',
+    };
+    logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', {
+      reason: 'ADDRESS_REQUIRED',
+      product_id,
+      quantity: qty,
     });
     return result;
   }
