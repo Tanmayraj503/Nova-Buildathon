@@ -26,7 +26,7 @@ On top of that safety layer, Nova also demonstrates the *growth* half of this tr
 
 ## Demo Video
 
-> 🎥 **[Watch the demo video](#)** *(link to be added)*
+> 🎥 **[Watch the demo video]([#](https://drive.google.com/file/d/173GrJlX6U7elxjcG1ZvjtpD7qtOn51G-/view?usp=drive_link))** *(link to be added)*
 
 *A walkthrough of Nova handling product discovery, all three guardrails, the human-in-the-loop approval flow, a real Razorpay test-mode payment, and the live audit trail.*
 
