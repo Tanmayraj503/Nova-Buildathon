@@ -175,8 +175,9 @@ Every guardrail failure returns a structured error (`ADDRESS_REQUIRED`, `SPEND_L
 
 ### Installation
 
-1. **Clone or unzip the project**, then move into the root folder:
+1. **Clone the Repository**, then move into the root folder:
    ```bash
+   git clone https://github.com/Tanmayraj503/Nova-Buildathon
    cd agentic-commerce
    ```
 
