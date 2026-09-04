@@ -158,7 +158,6 @@ Every guardrail failure returns a structured error (`ADDRESS_REQUIRED`, `SPEND_L
 | **Database** | SQLite (`better-sqlite3`) |
 | **Payments** | Razorpay Orders API + Checkout (Test/Sandbox Mode) |
 | **Frontend** | React 18, Tailwind CSS v4, Vite |
-| **Testing** | Custom zero-dependency integration test runner (live guardrail + happy-path tests) |
 | **Tooling** | npm workspaces monorepo (`backend/` + `frontend/`) |
 
 ---
@@ -236,17 +235,6 @@ Everything below can be reproduced live, not just watched in the video - try the
 | **Cross-sell / upsell** | Ask for any low-priced or out-of-stock item | A concrete, in-stock, budget-respecting alternative is suggested - computed from real data, not improvised. |
 | **Live audit trail** | Watch the right-hand panel during any of the above | Every user message, agent decision, tool call, guardrail block, and signature verification appears in real time, filterable by category, with the full raw JSON payload available on demand. |
 
-
-
----
-
-## Engineering Notes
-
-A few real problems came up during development that are worth being upfront about, since they shaped some of the design decisions above:
-
-- **A mid-build model deprecation.** Google retired `gemini-2.0-flash` mid-development with a 404 pointing at `gemini-3.6-flash` - which also changed the function-calling contract (`parameters` now expects an uppercase `Schema` type; plain JSON Schema needs the `parametersJsonSchema` field instead). This is why tool declarations use `parametersJsonSchema`, and part of why model resilience became a first-class feature rather than a hardcoded model string.
-- **A native-module compatibility gap.** `better-sqlite3` ships prebuilt binaries per Node ABI version; the version originally pinned had no prebuild for newer Node releases, which would silently force a from-source compile (and fail outright on a machine without Python/a C++ toolchain). Pinned to a version with an explicitly wide supported range (`20.x` through `26.x`) instead.
-- **Guardrail suggestions needed to live in message text, not a side field.** An early version of the upsell engine attached a suggestion as a separate structured field and instructed the model to mention it - which proved unreliable in practice. Suggestions are now embedded directly into the guardrail message text itself, reusing the same channel that guardrail explanations were already proven to relay faithfully.
 
 ---
 
