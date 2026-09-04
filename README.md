@@ -105,6 +105,20 @@ agentic-commerce/
 
 ---
 
+# Seeded Product Catalog
+ 
+The demo catalog isn't arbitrary — every product is chosen to exercise a specific piece of Nova's guardrail or upsell logic. Seeded by `npm run seed` (source: `backend/seed.js`).
+ 
+| # | Product | Price | Stock | Category | Description |
+|---|---|---|---|---|---|
+| 1 | Mechanical RGB Keyboard | ₹2,499 | 15 | Peripherals | Hot-swappable mechanical keyboard with per-key RGB lighting and tactile switches. |
+| 2 | Ergonomic Mouse | ₹1,299 | 25 | Peripherals | Vertical ergonomic mouse designed to reduce wrist strain during long sessions. |
+| 3 | Wireless ANC Headphones | ₹49.99 ⚠️ | 2 | Audio | Over-ear wireless headphones with Active Noise Cancellation, 30-hour battery life, fast charging, and dual-device multipoint pairing. |
+| 4 | UltraWide Curved Monitor | ₹18,500 | 5 | Displays | 34" curved ultrawide QHD monitor — great for productivity and gaming. |
+| 5 | Desk Pad | ₹799 | 0 | Accessories | Large felt + PU leather desk pad, water-resistant, non-slip base. |
+ 
+ ---
+
 ## Key Features & Technical Guardrails
 
 ### Key Features
