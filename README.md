@@ -107,13 +107,13 @@ agentic-commerce/
 
 # Seeded Product Catalog
  
-The demo catalog isn't arbitrary — every product is chosen to exercise a specific piece of Nova's guardrail or upsell logic. Seeded by `npm run seed` (source: `backend/seed.js`).
+The demo catalog isn't arbitrary - every product is chosen to exercise a specific piece of Nova's guardrail or upsell logic. Seeded by `npm run seed` (source: `backend/seed.js`).
  
 | # | Product | Price | Stock | Category | Description |
 |---|---|---|---|---|---|
 | 1 | Mechanical RGB Keyboard | ₹2,499 | 15 | Peripherals | Hot-swappable mechanical keyboard with per-key RGB lighting and tactile switches. |
 | 2 | Ergonomic Mouse | ₹1,299 | 25 | Peripherals | Vertical ergonomic mouse designed to reduce wrist strain during long sessions. |
-| 3 | Wireless ANC Headphones | ₹49.99 ⚠️ | 2 | Audio | Over-ear wireless headphones with Active Noise Cancellation, 30-hour battery life, fast charging, and dual-device multipoint pairing. |
+| 3 | Wireless ANC Headphones | ₹499.90  | 2 | Audio | Over-ear wireless headphones with Active Noise Cancellation, 30-hour battery life, fast charging, and dual-device multipoint pairing. |
 | 4 | UltraWide Curved Monitor | ₹18,500 | 5 | Displays | 34" curved ultrawide QHD monitor — great for productivity and gaming. |
 | 5 | Desk Pad | ₹799 | 0 | Accessories | Large felt + PU leather desk pad, water-resistant, non-slip base. |
  
@@ -127,7 +127,6 @@ The demo catalog isn't arbitrary — every product is chosen to exercise a speci
 - **Guarded, agentic checkout** - the agent can initiate a purchase, but never finalize a payment on its own.
 - **Human-in-the-loop authorization** - every order is a pending, reviewable card until a human explicitly approves it.
 - **Real Razorpay Test Mode integration** - genuine Razorpay orders, genuine Checkout modal, genuine HMAC signature verification - nothing mocked.
-- **UPI support** - Razorpay Checkout is configured with UPI enabled alongside card/netbanking/wallet.
 - **Live, explainable audit trail** - every user message, model decision, tool call, guardrail block, and payment verification is logged and streamed in real time, filterable by category.
 - **Deterministic upsell/cross-sell engine** - a real database query, not a prompt hope, surfaces an in-stock alternative whenever a product is unavailable, over budget, or low-value.
 - **Automatic model fallback** - if the active Gemini model is rate-limited, overloaded, or times out, the agent transparently falls back to the next model in the chain and logs the switch to the audit trail.
@@ -178,7 +177,7 @@ Every guardrail failure returns a structured error (`ADDRESS_REQUIRED`, `SPEND_L
 1. **Clone the Repository**, then move into the root folder:
    ```bash
    git clone https://github.com/Tanmayraj503/Nova-Buildathon
-   cd agentic-commerce
+   cd Nova-Buildathon
    ```
 
 2. **Install all dependencies** (installs both `backend/` and `frontend/` via npm workspaces in one command):
@@ -237,7 +236,7 @@ Everything below can be reproduced live, not just watched in the video - try the
 | **Cross-sell / upsell** | Ask for any low-priced or out-of-stock item | A concrete, in-stock, budget-respecting alternative is suggested - computed from real data, not improvised. |
 | **Live audit trail** | Watch the right-hand panel during any of the above | Every user message, agent decision, tool call, guardrail block, and signature verification appears in real time, filterable by category, with the full raw JSON payload available on demand. |
 
-**Testing UPI in Razorpay Checkout (Test Mode):** use the UPI ID `success@razorpay` to simulate a successful payment, or `failure@razorpay` to simulate a failed one.
+
 
 ---
 
