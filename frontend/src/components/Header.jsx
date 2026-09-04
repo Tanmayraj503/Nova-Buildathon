@@ -29,7 +29,7 @@ export default function Header({ sessionId, onNewSession }) {
         </svg>
         <div className="leading-tight">
           <p className="font-display text-[15px] font-semibold tracking-tight text-ink">
-            Nova <span className="font-normal text-ink-faint">/ Agentic Commerce</span>
+            Nova <span className="font-normal text-ink-faint">/ Agentic Commerce Platform</span>
           </p>
           <p className="hidden text-[10.5px] text-ink-faint sm:block">
             

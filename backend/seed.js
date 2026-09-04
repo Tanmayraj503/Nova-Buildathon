@@ -18,7 +18,7 @@ const PRODUCTS = [
   {
     name: 'Wireless ANC Headphones',
     description: 'Over-ear wireless headphones featuring Active Noise Cancellation (ANC), 30-hour battery life, fast charging, and dual-device multipoint pairing. Premium memory foam earcups designed for all-day comfort.',
-    price_inr: 49990, 
+    price_inr: 49990, // ₹499.90
     stock: 2,
     category: 'Audio',
   },
