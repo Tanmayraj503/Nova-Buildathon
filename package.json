@@ -2,7 +2,7 @@
   "name": "agentic-commerce",
   "private": true,
   "version": "1.0.0",
-  "description": "Razorpay Buildathon — Track 1 (Agentic Commerce). A Claude-powered shopping agent with human-in-the-loop payment authorization and a real-time explainable audit trail. Monorepo: backend (Express + SQLite + Claude tool-calling + Razorpay Sandbox) and frontend (React 18 + Tailwind v4).",
+  "description": "Razorpay Buildathon — Track 1 (Agentic Commerce). A Gemini-powered shopping agent with human-in-the-loop payment authorization and a real-time explainable audit trail. Monorepo: backend (Express + SQLite + Gemini tool-calling + Razorpay Sandbox) and frontend (React 18 + Tailwind v4).",
   "workspaces": [
     "backend",
     "frontend"

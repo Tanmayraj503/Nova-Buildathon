@@ -1,6 +1,6 @@
 # Agentic Commerce — Razorpay Buildathon (Track 1)
 
-A Claude-powered shopping agent that browses a product catalog, collects a shipping
+A Gemini-powered shopping agent that browses a product catalog, collects a shipping
 address, and creates **real Razorpay Sandbox orders** through tool calling — with
 hard server-side guardrails (spend limit, stock, address) and a full audit trail
 for explainability.
@@ -9,7 +9,7 @@ for explainability.
 
 - Node.js (ESM) + Express
 - SQLite via `better-sqlite3`
-- `@anthropic-ai/sdk` (`claude-3-5-sonnet-20240620`) for agent + tool calling
+- `@gemini-ai/sdk` (`Gemini-3.6-flash`) for agent + tool calling
 - `razorpay` SDK for real Sandbox order creation + HMAC-SHA256 payment verification
 
 ## Setup
@@ -25,7 +25,7 @@ npm start                # http://localhost:4000
 
 | Variable               | Where to get it                                                |
 |-------------------------|------------------------------------------------------------------|
-| `ANTHROPIC_API_KEY`     | console.anthropic.com                                            |
+| `GEMINI_API_KEY`     | aistudio.google.com                                            |
 | `RAZORPAY_KEY_ID`       | Razorpay Dashboard → Settings → API Keys (**Test/Sandbox mode**) |
 | `RAZORPAY_KEY_SECRET`   | same as above                                                     |
 
@@ -51,9 +51,9 @@ The agent has two tools:
 - **`search_catalog(query?)`** — read-only product lookup, always used instead of
   guessing prices/stock.
 - **`create_razorpay_order(product_id, quantity, shipping_address, user_id)`** —
-  the system prompt instructs Claude to only call this after the user has
+  the system prompt instructs Gemini to only call this after the user has
   **explicitly typed a shipping address in chat**. The tool itself re-enforces
-  this and two other guardrails server-side (Claude cannot bypass them):
+  this and two other guardrails server-side (Gemini cannot bypass them):
 
   | Condition                          | Error code             |
   |-------------------------------------|--------------------------|
@@ -86,7 +86,7 @@ stock that was reserved at order-creation time is restored.
 ## Testing
 
 `test-runner.js` is a zero-dependency integration test suite that exercises
-the 4 core edge cases against a **live** server — a real Claude agent talking
+the 4 core edge cases against a **live** server — a real Gemini agent talking
 to a real Razorpay Sandbox:
 
 ```bash
@@ -122,7 +122,7 @@ API keys.
 
 
 - **Guardrails live in the tool handler, not the prompt.** The system prompt
-  tells Claude the rules, but `create_razorpay_order` (`agent/toolHandlers.js`)
+  tells Gemini the rules, but `create_razorpay_order` (`agent/toolHandlers.js`)
   enforces them in code regardless of what the model decides — prompt
   injection or a model mistake cannot place an over-limit, out-of-stock, or
   address-less order.
@@ -146,9 +146,9 @@ lib/
   razorpay.js            Razorpay SDK client
   audit.js                logAudit() / getAuditTrail() helpers
 agent/
-  tools.js                Anthropic tool_use schema (search_catalog, create_razorpay_order)
+  tools.js                Gemini tool_use schema (search_catalog, create_razorpay_order)
   toolHandlers.js          Tool implementations + guardrails
-  agent.js                 Claude tool-calling orchestration loop
+  agent.js                 Gemini tool-calling orchestration loop
 routes/
   chat.js                  POST /api/chat
   auditTrail.js             GET /api/audit-trail

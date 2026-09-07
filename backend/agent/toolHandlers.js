@@ -154,7 +154,7 @@ export async function createRazorpayOrder(input, sessionId) {
       error: 'OUT_OF_STOCK',
       message:
         (product.stock === 0
-          ? `"${product.name}" is currently out of stock.`
+          ? `"${product.name}"   is currently out of stock.`
           : `Only ${product.stock} unit(s) of "${product.name}" are in stock; ${qty} were requested.`) +
         (suggestion ? ` ${suggestion.note}` : ''),
       available_stock: product.stock,
@@ -207,7 +207,6 @@ export async function createRazorpayOrder(input, sessionId) {
     return { error: 'RAZORPAY_ERROR', message: `Failed to create Razorpay order: ${message}` };
   }
 
-  // Persist order + decrement stock atomically so concurrent chats can't oversell.
   const persist = db.transaction(() => {
     const insertOrder = db.prepare(`
       INSERT INTO orders (razorpay_order_id, user_id, product_id, quantity, amount, shipping_address, status)

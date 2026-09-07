@@ -3,7 +3,7 @@
  * test-runner.js — Agentic Commerce integration test suite (Razorpay Buildathon, Track 1)
  *
  * Exercises the 4 "winning edge cases" against a REAL running server — a live
- * Claude tool-calling agent talking to a real Razorpay Sandbox:
+ * Gemini tool-calling agent talking to a real Razorpay Sandbox:
  *
  *   1. Happy Path        — ₹1,299 Ergonomic Mouse + address -> real order created,
  *                           then verified via HMAC-SHA256 signature check.
@@ -13,7 +13,7 @@
  *
  * PREREQUISITES
  *   - The backend is running (`npm start`) with REAL keys in .env:
- *       ANTHROPIC_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
+ *       GEMINI_API_KEY, RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET
  *   - The catalog is freshly seeded (`npm run seed`) so the fixtures below match.
  *   - Run this script from the backend project root (it reads .env from here).
  *
@@ -140,7 +140,7 @@ async function apiChat(sessionId, userId, message) {
         throw new Error(
           `POST /api/chat -> ${res.status}: ${data.message || JSON.stringify(data)}` +
             (res.status === 500 && /api[_-]?key/i.test(data.message || '')
-              ? '\n    (looks like ANTHROPIC_API_KEY is missing/invalid in .env)'
+              ? '\n    (looks like GEMINI_API_KEY is missing/invalid in .env)'
               : '')
         );
       }
