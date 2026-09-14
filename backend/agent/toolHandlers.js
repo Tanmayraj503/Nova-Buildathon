@@ -2,13 +2,14 @@ import db from '../db.js';
 import razorpay from '../lib/razorpay.js';
 import { logAudit } from '../lib/audit.js';
 
-export const SPEND_LIMIT_PAISE = 500_000; // ₹5,000 autonomous spend cap
-export const LOW_VALUE_THRESHOLD_PAISE = 100_000; // ₹1,000 — below this, actively try to upsell/cross-sell
+export const SPEND_LIMIT_PAISE = 500_000; // ₹5,000 autonomous spend cap per session
+export const LOW_VALUE_THRESHOLD_PAISE = 100_000; // ₹1,000 — below this the agent actively tries to upsell/cross-sell
 
 const getProductById = db.prepare('SELECT * FROM products WHERE id = ?');
 const getAllProducts = db.prepare(
   'SELECT id, name, description, price_inr, stock, category FROM products'
 );
+const reservestock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`);
 const searchProducts = db.prepare(`
   SELECT id, name, description, price_inr, stock, category
   FROM products
@@ -220,7 +221,6 @@ export async function createRazorpayOrder(input, sessionId) {
       amount,
       shipping_address
     );
-    db.prepare('UPDATE products SET stock = stock - ? WHERE id = ?').run(qty, product_id);
     return info.lastInsertRowid;
   });
 
