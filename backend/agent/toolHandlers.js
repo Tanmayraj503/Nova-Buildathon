@@ -9,7 +9,7 @@ const getProductById = db.prepare('SELECT * FROM products WHERE id = ?');
 const getAllProducts = db.prepare(
   'SELECT id, name, description, price_inr, stock, category FROM products'
 );
-const reservestock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`);
+const reserveStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`);
 const searchProducts = db.prepare(`
   SELECT id, name, description, price_inr, stock, category
   FROM products
@@ -39,19 +39,19 @@ function findCandidate(excludeId, priceCeilingPaise, preferCategory) {
   return findCandidateStmt.get(excludeId, priceCeilingPaise, preferCategory);
 }
 
-/**
- * Deterministic upsell/cross-sell suggestion for ANY product — always
- * returns one (when a valid candidate exists), not just for out-of-stock or
- * low-value items, so a suggestion is available at every point in the
- * conversation the model might need one (a decline message, a spend-limit
- * block, or right before checkout). `reason` records why it was offered.
- *
+/*
+ * Deterministic upsell/cross-sell suggestion for ANY product - always
+   returns one (when a valid candidate exists), not just for out-of-stock or
+   low-value items, so a suggestion is available at every point in the
+   conversation the model might need one (a decline message, a spend-limit
+   block, or right before checkout). `reason` records why it was offered.
+ 
  * Includes a ready-to-relay `note` sentence in addition to the structured
- * fields: attaching a separate JSON field and hoping the model notices and
- * mentions it on its own proved unreliable in testing — the model reliably
- * relays guardrail-style message text, so every consumer of this should
- * prefer embedding `note` directly into whatever text it's already relaying,
- * rather than leaving "should I mention this" up to the model's judgment.
+   fields: attaching a separate JSON field and hoping the model notices and
+   mentions it on its own proved unreliable in testing — the model reliably
+   relays guardrail-style message text, so every consumer of this should
+   prefer embedding `note` directly into whatever text it's already relaying,
+   rather than leaving "should I mention this" up to the model's judgment.
  */
 function findSuggestion(product, { priceCeilingPaise = SPEND_LIMIT_PAISE } = {}) {
   const isOutOfStock = product.stock === 0;
@@ -148,7 +148,7 @@ export async function createRazorpayOrder(input, sessionId) {
     return result;
   }
 
-  // --- Guardrail 2: stock availability --------------------------------------
+  // --- Guardrail 2: stock check + atomic reservation --------------------------------------
   if (product.stock < qty) {
     const suggestion = findSuggestion(product, { priceCeilingPaise: SPEND_LIMIT_PAISE });
     const result = {
@@ -166,6 +166,24 @@ export async function createRazorpayOrder(input, sessionId) {
       product_id,
       requested: qty,
       available: product.stock,
+    });
+    return result;
+  }
+
+  /**/
+  const reservation = reserveStock.run(qty, product_id, qty);
+  if(reservation.changes === 0){
+  const result = {
+      error: 'OUT_OF_STOCK',
+      message: `"${product.name}" just went out of stock - another person got the order first. Please try again later.`,
+      available_stock: 0,
+      ...(suggestion ? { upsell_suggestion: suggestion } : {}),
+    };
+    logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', {
+      reason: 'OUT_OF_STOCK',
+      product_id,
+      requested: qty,
+      note: 'stock changed between check and reservation - concurrent request',
     });
     return result;
   }
