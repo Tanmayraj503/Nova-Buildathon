@@ -10,6 +10,13 @@ const getAllProducts = db.prepare(
   'SELECT id, name, description, price_inr, stock, category FROM products'
 );
 const reserveStock = db.prepare(`UPDATE products SET stock = stock - ? WHERE id = ? AND stock >= ?`);
+
+//calculate the per session spend limit (successful and pending orders sum is calculated while the failed orders are excluded)
+const getSessionSpend = db.prepare (`
+SELECT COALESCE(SUM(amount), 0) as total
+FROM orders
+WHERE session_id = ? AND status IN ('CREATED', 'VERIFIED')
+`);
 const searchProducts = db.prepare(`
   SELECT id, name, description, price_inr, stock, category
   FROM products
@@ -120,7 +127,9 @@ export async function createRazorpayOrder(input, sessionId) {
   const qty = Math.max(1, parseInt(quantity, 10) || 1);
   const amount = product.price_inr * qty; // paise
 
-  // --- Guardrail 1: ₹5,000 autonomous spend limit --------------------------
+  // --- Guardrail 1: ₹5,000 autonomous spend limit--------------------------
+
+  //PART 1: per-order
   if (amount > SPEND_LIMIT_PAISE) {
     // Suggest something that IS within budget — reuses the same candidate
     // logic, just with the spend limit itself as the price ceiling instead
@@ -148,6 +157,33 @@ export async function createRazorpayOrder(input, sessionId) {
     return result;
   }
 
+  //PART 2: cummulative spend limit per-session
+  /*It queries the sum of all the successful and pending orders this session to check if the new order
+  exceeds our 5000 threshold, even if the order itself is under spend limit.
+  Failed orders are excluded since those payments never went through.*/
+  const { total: sessionSpend } = getSessionSpend.get(sessionId);
+  if (sessionSpend + amount > SPEND_LIMIT_PAISE){
+    const remaining = Math.max(0, SPEND_LIMIT_PAISE - sessionSpend);
+    logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', {
+      reason: 'SESSION_SPEND_LIMIT_EXCEEDED',
+      product_id,
+      quantity: qty,
+      amount,
+      session_spend: sessionSpend,
+      limit: SPEND_LIMIT_PAISE,
+    });
+    return {
+      error: 'SESSION_SPEND_LIMIT_EXCEEDED',
+      message:
+        `This order would bring your session total to ₹${((sessionSpend + amount) / 100).toLocaleString('en-IN')}, ` +
+        `exceeding the ₹${(SPEND_LIMIT_PAISE / 100).toLocaleString('en-IN')} per-session limit. ` +
+        `You have ₹${(remaining / 100).toLocaleString('en-IN')} remaining this session.`,
+      session_spend_inr: sessionSpend / 100,
+      remaining_inr: remaining / 100,
+    };
+  }
+  
+
   // --- Guardrail 2: stock check + atomic reservation --------------------------------------
   if (product.stock < qty) {
     const suggestion = findSuggestion(product, { priceCeilingPaise: SPEND_LIMIT_PAISE });
@@ -170,7 +206,8 @@ export async function createRazorpayOrder(input, sessionId) {
     return result;
   }
 
-  /**/
+  /*Atomically decrement the stock before calling razorpay api - closes the race condition
+  AND stock >= ? self-validates: prevent overselling of products*/
   const reservation = reserveStock.run(qty, product_id, qty);
   if(reservation.changes === 0){
   const result = {
