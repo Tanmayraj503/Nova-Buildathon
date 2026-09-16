@@ -26,6 +26,7 @@ db.exec(`
     id                 INTEGER PRIMARY KEY AUTOINCREMENT,
     razorpay_order_id  TEXT UNIQUE,
     user_id            TEXT    NOT NULL,
+    session_id         TEXT,
     product_id         INTEGER NOT NULL,
     quantity           INTEGER NOT NULL,
     amount             INTEGER NOT NULL,     -- paise, quantity * price_inr at time of order
@@ -46,6 +47,16 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs(session_id);
   CREATE INDEX IF NOT EXISTS idx_orders_rzp_id ON orders(razorpay_order_id);
+  CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
+
+
 `);
+/*SQLite doesn't support IF NOT EXISTS on ALTER TABLE, so wrap in try/catch —
+ if the column already exists the error is silently swallowed.*/
+try {
+  db.exec(`ALTER TABLE orders ADD COLUMN session_id TEXT`);
+} catch {
+  // column already exists - safe to ignore
+}
 
 export default db;
