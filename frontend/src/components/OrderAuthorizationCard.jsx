@@ -9,7 +9,7 @@ import { QUICK_AUTHORIZE_THRESHOLD_PAISE } from '../utils/orders';
  * page; everything else stays quiet so this card reads as "the moment that
  * matters."
  */
-export default function OrderAuthorizationCard({ order, onQuickAuthorize, onReviewApprove }) {
+export default function OrderAuthorizationCard({ order, onQuickAuthorize, onReviewApprove, onCheckStatus }) {
   const isQuickPath = order.amountPaise <= QUICK_AUTHORIZE_THRESHOLD_PAISE;
   const isBusy = order.status === 'PROCESSING' || order.status === 'VERIFYING';
 
@@ -65,7 +65,12 @@ export default function OrderAuthorizationCard({ order, onQuickAuthorize, onRevi
           aria-hidden="true"
         />
 
-        {isQuickPath ? (
+        {order.status === 'PAYMENT_PENDING' ? (
+          <>
+            <p role="status" className="mb-3 text-[12px] leading-relaxed text-ink-muted">Payment confirmation is pending. Check its status before starting another payment.</p>
+            <button type="button" onClick={onCheckStatus} className="w-full rounded-xl bg-authorize px-4 py-3 text-[13px] font-semibold text-canvas">Check payment status</button>
+          </>
+        ) : isQuickPath ? (
           <>
             <button
               type="button"
@@ -102,8 +107,8 @@ export default function OrderAuthorizationCard({ order, onQuickAuthorize, onRevi
 }
 
 function statusLabel(status, defaultLabel) {
-  if (status === 'PROCESSING') return 'Waiting for Razorpay Checkout…';
-  if (status === 'VERIFYING') return 'Verifying signature…';
+  if (status === 'PROCESSING') return 'Continue in Razorpay Checkout…';
+  if (status === 'VERIFYING') return 'Confirming payment…';
   return defaultLabel;
 }
 
