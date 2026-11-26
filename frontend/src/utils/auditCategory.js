@@ -118,7 +118,9 @@ export function classifyLog(log) {
     case 'PAYMENT_VERIFICATION':
       return {
         category: 'RAZORPAY_API',
-        summary: `Signature ${payload?.verified ? 'valid' : 'invalid'} → status: ${payload?.status}`,
+        summary: payload?.payment_status === 'captured'
+          ? `Payment captured → status: ${payload.status}`
+          : `Signature ${payload?.verified ? 'valid' : 'invalid'} → status: ${payload?.status}`,
       };
 
     default:
