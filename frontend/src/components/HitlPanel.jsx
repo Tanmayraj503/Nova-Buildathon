@@ -1,19 +1,17 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import PanelHeader from './PanelHeader';
 import PaymentBadge from './PaymentBadge';
 import OrderAuthorizationCard from './OrderAuthorizationCard';
 import ReviewModal from './ReviewModal';
-import { verifyPayment } from '../lib/api';
-import { openRazorpayCheckout } from '../lib/razorpay';
+import { useCheckout } from '../hooks/useCheckout';
 import { deriveOrdersFromAuditLogs, getVerificationStatus } from '../utils/orders';
 import { formatINR } from '../utils/format';
 
-const PENDING_STATES = new Set(['PENDING_AUTH', 'PROCESSING', 'VERIFYING']);
+const PENDING_STATES = new Set(['PENDING_AUTH', 'PROCESSING', 'VERIFYING', 'PAYMENT_PENDING']);
 
 export default function HitlPanel({ auditLogs, sessionId }) {
-  const [localStatus, setLocalStatus] = useState({}); // razorpayOrderId -> status override
+  const { localStatus, checkoutError, runCheckout, checkStatus } = useCheckout(sessionId);
   const [reviewOrder, setReviewOrder] = useState(null);
-  const [checkoutError, setCheckoutError] = useState(null);
 
   const orders = useMemo(() => deriveOrdersFromAuditLogs(auditLogs), [auditLogs]);
 
@@ -21,54 +19,15 @@ export default function HitlPanel({ auditLogs, sessionId }) {
     () =>
       orders.map((o) => {
         const auditStatus = getVerificationStatus(o.razorpayOrderId, auditLogs);
-        const status = localStatus[o.razorpayOrderId] ?? auditStatus ?? 'PENDING_AUTH';
+        const status = auditStatus === 'VERIFIED' ? 'VERIFIED' : localStatus[o.razorpayOrderId] ?? auditStatus ?? 'PENDING_AUTH';
         return { ...o, status };
       }),
     [orders, auditLogs, localStatus]
   );
 
-  const pendingOrder = [...resolvedOrders].reverse().find((o) => PENDING_STATES.has(o.status));
+  const pendingOrder = resolvedOrders.find((o) => ['PROCESSING', 'VERIFYING', 'PAYMENT_PENDING'].includes(o.status))
+    ?? [...resolvedOrders].reverse().find((o) => PENDING_STATES.has(o.status));
   const historyOrders = resolvedOrders.filter((o) => o.razorpayOrderId !== pendingOrder?.razorpayOrderId);
-
-  const setStatus = useCallback((razorpayOrderId, status) => {
-    setLocalStatus((prev) => ({ ...prev, [razorpayOrderId]: status }));
-  }, []);
-
-  const runCheckout = useCallback(
-    (order) => {
-      setCheckoutError(null);
-      setStatus(order.razorpayOrderId, 'PROCESSING');
-
-      openRazorpayCheckout({
-        keyId: order.razorpayKeyId,
-        amountPaise: order.amountPaise,
-        razorpayOrderId: order.razorpayOrderId,
-        productName: order.product,
-        shippingAddress: order.shippingAddress,
-        onSuccess: async (response) => {
-          setStatus(order.razorpayOrderId, 'VERIFYING');
-          try {
-            const result = await verifyPayment({
-              razorpayOrderId: response.razorpay_order_id,
-              razorpayPaymentId: response.razorpay_payment_id,
-              razorpaySignature: response.razorpay_signature,
-              sessionId,
-            });
-            setStatus(order.razorpayOrderId, result.status);
-          } catch (err) {
-            setCheckoutError(err.message);
-            setStatus(order.razorpayOrderId, 'FAILED');
-          }
-        },
-        onDismiss: () => setStatus(order.razorpayOrderId, 'PENDING_AUTH'),
-        onError: (message) => {
-          setCheckoutError(message);
-          setStatus(order.razorpayOrderId, 'PENDING_AUTH');
-        },
-      });
-    },
-    [sessionId, setStatus]
-  );
 
   return (
     <section className="flex min-h-0 flex-col bg-panel">
@@ -81,7 +40,7 @@ export default function HitlPanel({ auditLogs, sessionId }) {
 
       <div className="flex-1 space-y-4 overflow-y-auto px-4 py-4">
         {checkoutError && (
-          <div className="break-words rounded-lg border border-signal-error/40 bg-signal-error/10 px-3 py-2 text-[12px] text-signal-error">
+          <div role="alert" className="break-words rounded-lg border border-signal-error/40 bg-signal-error/10 px-3 py-2 text-[12px] text-signal-error">
             {checkoutError}
           </div>
         )}
@@ -91,6 +50,7 @@ export default function HitlPanel({ auditLogs, sessionId }) {
             order={pendingOrder}
             onQuickAuthorize={() => runCheckout(pendingOrder)}
             onReviewApprove={() => setReviewOrder(pendingOrder)}
+            onCheckStatus={() => checkStatus(pendingOrder)}
           />
         ) : (
           <EmptyState />
