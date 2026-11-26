@@ -52,12 +52,18 @@ faithful, literal record of everything the UI acted on.
 
 ### Payment status
 
-`window.Razorpay`'s `handler` callback receives `razorpay_payment_id` and
-`razorpay_signature`, which are POSTed to `/api/verify-payment` along with
-the `session_id`. The returned `status` (`VERIFIED` / `FAILED`) drives the
-`PaymentBadge`. Status is also cross-checked against `PAYMENT_VERIFICATION`
-events in the polled audit trail, so a page refresh mid-flow doesn't lose
-state.
+After approval, `/api/checkout-session` validates the saved order and supplies
+checkout options. The Razorpay script loads on demand and can retry a failed
+load. Test checkout uses Cards to avoid UPI app and bank redirect dependencies.
+Use `5267 3181 8797 5449`, any future expiry, CVV `123`, and test OTP `123456`.
+Skip saving the test card when prompted.
+
+The success callback is sent to `/api/verify-payment`. The server verifies the
+signature and confirms capture before `PaymentBadge` shows `VERIFIED`.
+Dismissal, failed attempts and lost responses trigger `/api/payment-status`
+recovery. Unconfirmed payments show **Check payment status** instead of inviting
+another charge. Success from the audit trail takes precedence over local state.
+Changing sessions closes an active popup. Only one checkout can open at a time.
 
 ### Audit trail categories
 
@@ -96,7 +102,7 @@ judges to inspect exact tool inputs/outputs.
 ## Project structure
 
 ```
-index.html                    fonts, Razorpay Checkout script, root div
+index.html                    fonts, root div
 src/
   main.jsx                     entrypoint
   App.jsx                       session state, wires the 3 panels together
