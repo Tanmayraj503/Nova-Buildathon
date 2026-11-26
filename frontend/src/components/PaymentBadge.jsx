@@ -10,7 +10,7 @@ const STATUS_STYLES = {
     classes: 'bg-authorize/10 text-authorize border-authorize/40',
   },
   VERIFYING: {
-    label: 'Verifying Signature…',
+    label: 'Confirming Payment…',
     icon: '⏳',
     classes: 'bg-signal-tool/10 text-signal-tool border-signal-tool/40',
   },
@@ -18,6 +18,11 @@ const STATUS_STYLES = {
     label: 'Payment Verified',
     icon: '✅',
     classes: 'bg-signal-pay/10 text-signal-pay border-signal-pay/40',
+  },
+  PAYMENT_PENDING: {
+    label: 'Confirmation Pending',
+    icon: '⏳',
+    classes: 'bg-authorize/10 text-authorize border-authorize/40',
   },
   FAILED: {
     label: 'Payment Failed',
