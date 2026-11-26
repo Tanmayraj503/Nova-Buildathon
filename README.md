@@ -67,7 +67,7 @@ flowchart TD
 4. `create_razorpay_order` is where every guardrail lives: missing address, spend limit, and stock are all checked in code, in that order, before a real Razorpay order is ever created. Any failure returns a structured error - with a suggested alternative embedded directly in the message - that the agent relays back to the user.
 5. If every guardrail passes, a real order is created via the Razorpay Orders API (Test Mode) and persisted locally - but it is **not** paid for yet.
 6. The pending order surfaces as an interactive **Authorization Card** in the Human-in-the-Loop panel. Nothing proceeds without an explicit human "Review & Approve."
-7. Approval launches the official Razorpay Checkout modal. The resulting payment response is posted to `/api/verify-payment`, which independently recomputes the HMAC-SHA256 signature (constant-time comparison) rather than trusting the client - a forged or failed signature restores the reserved stock automatically.
+7. Approval validates the saved order and launches a guided Razorpay Test Card Checkout. `/api/verify-payment` checks the HMAC signature, payment amount and order, then confirms capture before showing success. Lost callbacks can be recovered through `/api/payment-status`; invalid callbacks never release stock or undo a paid order.
 8. Every step above - not just the successful path - is written to `audit_logs` and streamed to the Explainable AI Audit Trail panel, polling every 2 seconds, categorized into User Input, Agent Reasoning, Tool Calls, Razorpay API events, and Guardrail/Errors.
 
 **Monorepo layout:**
