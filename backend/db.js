@@ -3,7 +3,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = path.join(__dirname, 'buildathon.db');
+const DB_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'buildathon.db');
 
 const db = new Database(DB_PATH);
 
@@ -47,16 +47,14 @@ db.exec(`
 
   CREATE INDEX IF NOT EXISTS idx_audit_session ON audit_logs(session_id);
   CREATE INDEX IF NOT EXISTS idx_orders_rzp_id ON orders(razorpay_order_id);
-  CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
 
 
 `);
-/*SQLite doesn't support IF NOT EXISTS on ALTER TABLE, so wrap in try/catch —
- if the column already exists the error is silently swallowed.*/
-try {
-  db.exec(`ALTER TABLE orders ADD COLUMN session_id TEXT`);
-} catch {
-  // column already exists - safe to ignore
+// Migrate existing databases before creating indexes on the added columns.
+const orderColumns = new Set(db.pragma('table_info(orders)').map((column) => column.name));
+for (const column of ['session_id', 'razorpay_key_id', 'razorpay_payment_id']) {
+  if (!orderColumns.has(column)) db.exec(`ALTER TABLE orders ADD COLUMN ${column} TEXT`);
 }
+db.exec('CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id)');
 
 export default db;
