@@ -55,7 +55,7 @@ export default function App() {
       <Header sessionId={sessionId} onNewSession={handleNewSession} />
       <main className="grid min-h-0 flex-1 grid-cols-1 gap-px overflow-hidden bg-hairline lg:grid-cols-3">
         <ChatPanel messages={messages} onSend={handleSend} isSending={isSending} />
-        <HitlPanel auditLogs={auditLogs} sessionId={sessionId} />
+        <HitlPanel key={sessionId} auditLogs={auditLogs} sessionId={sessionId} />
         <AuditPanel logs={auditLogs} error={auditError} />
       </main>
     </div>
