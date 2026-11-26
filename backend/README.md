@@ -115,8 +115,8 @@ Output is colored, timestamped, and ends with a pass/fail summary table —
 built for screen-recording in a demo video. Add `--verbose` to dump the raw
 audit trail JSON for any failing test.
 
-Run `npm run test:checkout` from the repository root for isolated payment,
-reservation, HTTP endpoint, and popup lifecycle regression tests. In the UI,
+Run `npm run test:checkout` from the repository root for checkout configuration
+and popup lifecycle regression tests. In the UI,
 approve an order, choose **Cards**, enter `5267 3181 8797 5449`, a future expiry,
 CVV `123` and test OTP `123456`. Skip saving the test card. Expect **Payment Verified** and a captured-payment
 audit event. No real money moves. Also test dismissal and a failed attempt followed by
