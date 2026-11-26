@@ -48,7 +48,7 @@ export default function ReviewModal({ order, onConfirm, onCancel }) {
             onClick={onConfirm}
             className="flex-1 rounded-xl bg-authorize px-4 py-2.5 text-[13px] font-semibold text-canvas transition-opacity hover:opacity-90"
           >
-            Confirm &amp; Pay
+            Confirm &amp; Test Pay
           </button>
         </div>
       </div>
