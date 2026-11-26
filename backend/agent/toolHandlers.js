@@ -1,5 +1,5 @@
 import db from '../db.js';
-import razorpay from '../lib/razorpay.js';
+import razorpay, { assertTestMode, razorpayConfig } from '../lib/razorpay.js';
 import { logAudit } from '../lib/audit.js';
 
 export const SPEND_LIMIT_PAISE = 500_000; // ₹5,000 autonomous spend cap per session
@@ -206,25 +206,6 @@ export async function createRazorpayOrder(input, sessionId) {
     return result;
   }
 
-  /*Atomically decrement the stock before calling razorpay api - closes the race condition
-  AND stock >= ? self-validates: prevent overselling of products*/
-  const reservation = reserveStock.run(qty, product_id, qty);
-  if(reservation.changes === 0){
-  const result = {
-      error: 'OUT_OF_STOCK',
-      message: `"${product.name}" just went out of stock - another person got the order first. Please try again later.`,
-      available_stock: 0,
-      ...(suggestion ? { upsell_suggestion: suggestion } : {}),
-    };
-    logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', {
-      reason: 'OUT_OF_STOCK',
-      product_id,
-      requested: qty,
-      note: 'stock changed between check and reservation - concurrent request',
-    });
-    return result;
-  }
-
   // --- Guardrail 3: shipping address is mandatory ---------------------------
   // Checked last: this product is confirmed orderable (within budget, in
   // stock) at this point, so it's actually worth asking for delivery details.
@@ -244,6 +225,17 @@ export async function createRazorpayOrder(input, sessionId) {
   }
 
   // --- All guardrails passed: create the real Razorpay Sandbox order -------
+  try {
+    assertTestMode();
+  } catch (err) {
+    return { error: 'RAZORPAY_ERROR', message: err.message };
+  }
+  const reservation = reserveStock.run(qty, product_id, qty);
+  if (reservation.changes === 0) {
+    logAudit(sessionId, 'GUARDRAIL_BLOCK', 'system', { reason: 'OUT_OF_STOCK', product_id, requested: qty });
+    return { error: 'OUT_OF_STOCK', message: `"${product.name}" just went out of stock. Please choose another item.` };
+  }
+
   let rzpOrder;
   try {
     rzpOrder = await razorpay.orders.create({
@@ -258,6 +250,7 @@ export async function createRazorpayOrder(input, sessionId) {
       },
     });
   } catch (err) {
+    db.prepare('UPDATE products SET stock = stock + ? WHERE id = ?').run(qty, product_id);
     const message = err?.error?.description || err.message || 'Unknown Razorpay error';
     logAudit(sessionId, 'TOOL_ERROR', 'system', { reason: 'RAZORPAY_API_ERROR', message });
     return { error: 'RAZORPAY_ERROR', message: `Failed to create Razorpay order: ${message}` };
@@ -265,8 +258,8 @@ export async function createRazorpayOrder(input, sessionId) {
 
   const persist = db.transaction(() => {
     const insertOrder = db.prepare(`
-      INSERT INTO orders (razorpay_order_id, user_id, product_id, quantity, amount, shipping_address, status)
-      VALUES (?, ?, ?, ?, ?, ?, 'CREATED')
+      INSERT INTO orders (razorpay_order_id, user_id, product_id, quantity, amount, shipping_address, session_id, razorpay_key_id, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'CREATED')
     `);
     const info = insertOrder.run(
       rzpOrder.id,
@@ -274,12 +267,21 @@ export async function createRazorpayOrder(input, sessionId) {
       product_id,
       qty,
       amount,
-      shipping_address
+      shipping_address,
+      sessionId,
+      razorpayConfig.keyId
     );
     return info.lastInsertRowid;
   });
 
-  const orderId = persist();
+  let orderId;
+  try {
+    orderId = persist();
+  } catch (err) {
+    db.prepare('UPDATE products SET stock = stock + ? WHERE id = ?').run(qty, product_id);
+    logAudit(sessionId, 'TOOL_ERROR', 'system', { reason: 'ORDER_SAVE_ERROR', message: err.message });
+    return { error: 'RAZORPAY_ERROR', message: 'The order could not be saved. Please try again.' };
+  }
 
   return {
     success: true,
@@ -292,7 +294,7 @@ export async function createRazorpayOrder(input, sessionId) {
     quantity: qty,
     shipping_address,
     status: 'CREATED',
-    razorpay_key_id: process.env.RAZORPAY_KEY_ID,
+    razorpay_key_id: razorpayConfig.keyId,
     checkout_note:
       'Use razorpay_key_id + razorpay_order_id on the client to open Razorpay Checkout, ' +
       'then POST the payment response to /api/verify-payment to confirm the payment.',

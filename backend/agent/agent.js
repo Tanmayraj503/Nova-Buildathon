@@ -12,7 +12,7 @@ import { logAudit } from '../lib/audit.js';
 // known to be exhausted there's no point re-trying it for a different user.
 // gemini-3.7-flash was tried and dropped — it repeatedly hit quota/deadline
 // issues on the free tier, so the chain now starts at 3.6-flash instead.
-const MODEL_FALLBACK_CHAIN = ['gemini-3.6-flash', 'gemini-3.5-flash', 'gemini-3.5-flash-lite'];
+const MODEL_FALLBACK_CHAIN = ['gemini-4-argon', 'gemini-4-hydrogen', 'gemini-3.5-flash-lite'];
 let currentModelIndex = 0;
 
 const MAX_AGENT_TURNS = 6; // safety cap on tool-use round trips per user message
