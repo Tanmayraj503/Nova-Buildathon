@@ -5,8 +5,8 @@
  * Exercises the 4 "winning edge cases" against a REAL running server — a live
  * Gemini tool-calling agent talking to a real Razorpay Sandbox:
  *
- *   1. Happy Path        — ₹1,299 Ergonomic Mouse + address -> real order created,
- *                           then verified via HMAC-SHA256 signature check.
+ *   1. Checkout handoff — ₹1,299 Ergonomic Mouse + address -> real order created,
+ *                           server preflight ready and forged callback rejected.
  *   2. Missing Address    -> ADDRESS_REQUIRED guardrail.
  *   3. Spend Limit        -> ₹18,500 Monitor exceeds ₹5,000 -> SPEND_LIMIT_EXCEEDED.
  *   4. Out of Stock       -> ₹799 Desk Pad (stock 0) -> OUT_OF_STOCK.
@@ -248,7 +248,7 @@ async function driveToOrderAttempt(sessionId, userId, initialMessage) {
 // Test 1 — Happy Path
 // ---------------------------------------------------------------------------
 async function testHappyPath() {
-  const name = '1. Happy Path — ₹1,299 Ergonomic Mouse';
+  const name = '1. Checkout handoff — ₹1,299 Ergonomic Mouse';
   const t0 = Date.now();
   let logs;
   try {
@@ -270,26 +270,27 @@ async function testHappyPath() {
     assertTrue(!!order.razorpay_key_id, 'razorpay_key_id present for client-side checkout');
     ok('order shape matches expected fixture — real Razorpay Sandbox order confirmed');
 
-    // Independently compute the same HMAC-SHA256 signature /api/verify-payment
-    // expects, using a synthetic payment id (in production this id comes from
-    // the Razorpay Checkout `handler` callback in the browser).
-    const paymentId = `pay_test_${crypto.randomBytes(6).toString('hex')}`;
-    const signature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '')
-      .update(`${order.razorpay_order_id}|${paymentId}`)
-      .digest('hex');
+    // A synthetic payment is never proof of a paid order. Exercise the
+    // preflight here; complete payment in the browser with the test bank UI.
+    const prepared = await fetch(`${BASE_URL}/api/checkout-session`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ razorpay_order_id: order.razorpay_order_id, session_id: sessionId }),
+    });
+    const checkout = await prepared.json();
+    assertTrue(prepared.ok, 'server preflight succeeded');
+    assertEqual(checkout.status, 'READY', 'checkout ready');
+    assertEqual(checkout.checkout.amountPaise, FIXTURES.mouse.unitPaise, 'server-owned checkout amount');
 
-    step('POST /api/verify-payment with a validly-signed payment...');
+    step('POST /api/verify-payment with a forged callback...');
     const verifyRes = await apiVerifyPayment({
       razorpay_order_id: order.razorpay_order_id,
-      razorpay_payment_id: paymentId,
-      razorpay_signature: signature,
+      razorpay_payment_id: 'pay_fabricated',
+      razorpay_signature: '0'.repeat(64),
       session_id: sessionId,
     });
-    assertTrue(verifyRes.ok, `verify-payment responded 2xx (got ${verifyRes.status})`);
-    assertTrue(verifyRes.data.verified === true, 'signature verified === true');
-    assertEqual(verifyRes.data.status, 'VERIFIED', 'order status after verification');
-    ok('signature check logic confirmed — HMAC-SHA256 verification passed, order marked VERIFIED');
+    assertEqual(verifyRes.status, 400, 'forged callback rejected');
+    assertEqual(verifyRes.data.error, 'INVALID_SIGNATURE', 'signature rejection code');
+    ok('real checkout preflight passed; fabricated payment rejected');
 
     return passResult(name, t0);
   } catch (err) {
@@ -453,13 +454,8 @@ async function main() {
   }
   ok('server is up');
 
-  if (!process.env.RAZORPAY_KEY_SECRET) {
-    warn("RAZORPAY_KEY_SECRET not found in this script's environment — Test 1's signature check will fail.");
-    warn('Run this script from the backend project root (same folder as .env).');
-  }
-
   const suite = [
-    { label: 'Test 1 — Happy Path', fn: testHappyPath },
+    { label: 'Test 1 — Checkout Handoff', fn: testHappyPath },
     { label: 'Test 2 — Missing Address', fn: testMissingAddress },
     { label: 'Test 3 — Spend Limit Guardrail', fn: testSpendLimit },
     { label: 'Test 4 — Out-of-Stock Guardrail', fn: testOutOfStock },
