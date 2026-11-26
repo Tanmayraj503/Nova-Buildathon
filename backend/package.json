@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "Track 1 (Agentic Commerce) — Razorpay Buildathon backend: a Gemini-3.6-Flash-powered shopping agent with tool calling, spend-limit/stock/address guardrails, real Razorpay Sandbox order creation, HMAC payment verification, and a full audit trail.",
+  "description": "Razorpay Buildathon backend: a Gemini-3.8-Flash-powered shopping agent with tool calling, spend-limit/stock/address guardrails, real Razorpay Sandbox order creation, HMAC payment verification, and a full audit trail.",
   "type": "module",
   "main": "server.js",
   "scripts": {
