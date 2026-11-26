@@ -31,17 +31,39 @@ export async function fetchAuditTrail(sessionId) {
 }
 
 export async function verifyPayment({ razorpayOrderId, razorpayPaymentId, razorpaySignature, sessionId }) {
-  const res = await fetch(`${API_BASE}/api/verify-payment`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
+  return paymentRequest('/verify-payment', {
       razorpay_order_id: razorpayOrderId,
       razorpay_payment_id: razorpayPaymentId,
       razorpay_signature: razorpaySignature,
       session_id: sessionId,
-    }),
   });
-  const data = await safeJson(res);
-  if (!res.ok) throw new Error(data?.message || `Payment verification failed (${res.status})`);
-  return data; // { verified, status, order_id, razorpay_order_id }
+}
+
+export function prepareCheckout({ razorpayOrderId, sessionId }) {
+  return paymentRequest('/checkout-session', { razorpay_order_id: razorpayOrderId, session_id: sessionId });
+}
+
+export function checkPaymentStatus({ razorpayOrderId, sessionId }) {
+  return paymentRequest('/payment-status', { razorpay_order_id: razorpayOrderId, session_id: sessionId });
+}
+
+async function paymentRequest(path, body) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000);
+  try {
+    const res = await fetch(`${API_BASE}/api${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: controller.signal,
+    });
+    const data = await safeJson(res);
+    if (!res.ok || !data) {
+      const error = new Error(data?.message || `Payment service could not respond (${res.status}). Please try again.`);
+      error.code = data?.error;
+      throw error;
+    }
+    return data;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('Payment confirmation timed out. Check payment status before trying again.');
+    throw error;
+  } finally { clearTimeout(timeout); }
 }
