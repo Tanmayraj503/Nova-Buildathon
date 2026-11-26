@@ -1,0 +1,22 @@
+﻿import express from 'express';
+import dotenv from 'dotenv';
+import path from 'node:path';
+dotenv.config({ path: 'backend/.env' });
+process.env.DATABASE_PATH = ':memory:';
+const { default: db } = await import('./db.js');
+const { createRazorpayOrder } = await import('./agent/toolHandlers.js');
+const { logAudit } = await import('./lib/audit.js');
+const { default: payments } = await import('./routes/verifyPayment.js');
+const { default: audits } = await import('./routes/auditTrail.js');
+db.prepare('INSERT INTO products (id, name, price_inr, stock) VALUES (1, ?, 129900, 10)').run('Ergonomic Mouse');
+const app = express();
+app.use(express.json());
+app.post('/api/chat', async (req, res) => {
+  const { session_id } = req.body;
+  const output = await createRazorpayOrder({product_id:1,quantity:1,shipping_address:'42 Test Lane, Bengaluru 560001',user_id:'checkout_smoke'},session_id);
+  logAudit(session_id, 'TOOL_RESULT', 'system', {tool:'create_razorpay_order',output});
+  res.json({session_id,reply:output.success ? 'Sandbox test order ready for review.' : output.message});
+});
+app.use('/api', payments, audits);
+app.use(express.static(path.resolve('frontend/dist')));
+app.listen(4001,'127.0.0.1',()=>console.log('Isolated bank checkout smoke server at http://127.0.0.1:4001'));
