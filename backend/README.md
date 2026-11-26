@@ -75,13 +75,23 @@ chronological order — the explainability trail for what the agent did and why.
   "razorpay_order_id": "order_xxx",
   "razorpay_payment_id": "pay_xxx",
   "razorpay_signature": "hex...",
-  "session_id": "optional — links this event into the chat's audit trail"
+  "session_id": "required — the session that created the order"
 }
 ```
 Recomputes `HMAC-SHA256(order_id + "|" + payment_id, key_secret)` and compares
 it (constant-time) against the signature returned by Razorpay Checkout on the
-client. Sets the order's `status` to `VERIFIED` or `FAILED`; on failure, the
-stock that was reserved at order-creation time is restored.
+client. Fetches the real payment, checks its order, amount and currency, and
+captures it if authorized. Only a captured payment sets `VERIFIED`. Duplicate
+callbacks are idempotent. Invalid signatures never change the order or stock.
+
+### Checkout preflight and recovery
+
+`POST /api/checkout-session` and `POST /api/payment-status` accept
+`{ "razorpay_order_id": "order_xxx", "session_id": "..." }`.
+Preflight returns server-owned checkout options with `READY`, or recovers an
+existing payment as `VERIFIED` / `PAYMENT_PENDING`. Status recovery uses the
+authenticated Razorpay API when the browser callback is lost. Test keys are
+required; the key secret is never sent to the browser.
 
 ## Testing
 
@@ -96,7 +106,7 @@ npm test                 # in another terminal
 
 | # | Test | What it proves |
 |---|------|-----------------|
-| 1 | Happy path — ₹1,299 Ergonomic Mouse | Real order created via `create_razorpay_order`, then independently verified with a correctly-computed HMAC-SHA256 signature via `/api/verify-payment` |
+| 1 | Checkout handoff — ₹1,299 Ergonomic Mouse | Real order created, server preflight succeeds, and a forged callback is rejected. Complete actual payment through the browser. |
 | 2 | Missing address | No order is ever created without an address — either the agent asks first, or the `ADDRESS_REQUIRED` guardrail blocks it |
 | 3 | Spend limit | No order above ₹5,000 is ever created — either the agent declines proactively, or `SPEND_LIMIT_EXCEEDED` blocks it |
 | 4 | Out of stock | No order for the (0-stock) Desk Pad is ever created — either the agent declines proactively, or `OUT_OF_STOCK` blocks it |
@@ -104,6 +114,13 @@ npm test                 # in another terminal
 Output is colored, timestamped, and ends with a pass/fail summary table —
 built for screen-recording in a demo video. Add `--verbose` to dump the raw
 audit trail JSON for any failing test.
+
+Run `npm run test:checkout` from the repository root for isolated payment,
+reservation, HTTP endpoint, and popup lifecycle regression tests. In the UI,
+approve an order, choose **Cards**, enter `5267 3181 8797 5449`, a future expiry,
+CVV `123` and test OTP `123456`. Skip saving the test card. Expect **Payment Verified** and a captured-payment
+audit event. No real money moves. Also test dismissal and a failed attempt followed by
+a retry; the same order should stay available and stock should stay reserved.
 
 **Why tests 2–4 check two different outcomes:** the three guardrails only run
 *inside* `create_razorpay_order`, which only a live agent decides to call. A
