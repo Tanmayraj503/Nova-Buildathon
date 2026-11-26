@@ -14,7 +14,8 @@
     "start": "npm run start -w backend",
     "demo": "npm run build && npm run start",
     "test": "npm run test -w backend",
-    "test:selftest": "npm run test:selftest -w backend"
+    "test:selftest": "npm run test:selftest -w backend",
+    "test:checkout": "node --test backend/payment.test.js backend/order-creation.test.js frontend/src/lib/razorpay.test.js"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"
